@@ -405,6 +405,23 @@ func (txmp *TxMempool) GetTxsForKeys(txKeys []types.TxKey) types.Txs {
 	return txs
 }
 
+func (txmp *TxMempool) SafeGetTxsForKeys(txKeys []types.TxKey) (types.Txs, []types.TxKey) {
+	txmp.mtx.RLock()
+	defer txmp.mtx.RUnlock()
+
+	txs := make([]types.Tx, 0, len(txKeys))
+	missing := []types.TxKey{}
+	for _, txKey := range txKeys {
+		wtx := txmp.txStore.GetTxByHash(txKey)
+		if wtx == nil {
+			missing = append(missing, txKey)
+			continue
+		}
+		txs = append(txs, wtx.tx)
+	}
+	return txs, missing
+}
+
 // Flush empties the mempool. It acquires a read-lock, fetches all the
 // transactions currently in the transaction store and removes each transaction
 // from the store and all indexes and finally resets the cache.
@@ -428,18 +445,25 @@ func (txmp *TxMempool) Flush() {
 
 // ReapMaxBytesMaxGas returns a list of transactions within the provided size
 // and gas constraints. Transaction are retrieved in priority order.
+// There are 4 types of constraints.
+//  1. maxBytes - stops pulling txs from mempool once maxBytes is hit. Can be set to -1 to be ignored.
+//  2. maxGasWanted - stops pulling txs from mempool once total gas wanted exceeds maxGasWanted.
+//     Can be set to -1 to be ignored.
+//  3. maxGasEstimated - similar to maxGasWanted but will use the estimated gas used for EVM txs
+//     while still using gas wanted for cosmos txs. Can be set to -1 to be ignored.
 //
 // NOTE:
 //   - Transactions returned are not removed from the mempool transaction
 //     store or indexes.
-func (txmp *TxMempool) ReapMaxBytesMaxGas(maxBytes, maxGas, minTxsInBlock int64) types.Txs {
+func (txmp *TxMempool) ReapMaxBytesMaxGas(maxBytes, maxGasWanted, maxGasEstimated, minTxsInBlock int64) types.Txs {
 	txmp.mtx.Lock()
 	defer txmp.mtx.Unlock()
 
 	var (
-		totalGas        int64
-		totalSize       int64
-		nonzeroGasTxCnt int64
+		totalGasWanted    int64
+		totalGasEstimated int64
+		totalSize         int64
+		nonzeroGasTxCnt   int64
 	)
 
 	var txs []types.Tx
@@ -455,21 +479,24 @@ func (txmp *TxMempool) ReapMaxBytesMaxGas(maxBytes, maxGas, minTxsInBlock int64)
 		}
 
 		// if the tx doesn't have a gas estimate, fallback to gas wanted
-		var gasEstimateOrWanted int64
+		var txGasEstimate int64
 		if wtx.estimatedGas > 0 {
-			gasEstimateOrWanted = wtx.estimatedGas
+			txGasEstimate = wtx.estimatedGas
 		} else {
-			gasEstimateOrWanted = wtx.gasWanted
+			txGasEstimate = wtx.gasWanted
 		}
 
 		totalSize += size
-		gas := totalGas + gasEstimateOrWanted
-		maxGasExceeded := maxGas > -1 && gas > maxGas
-		if nonzeroGasTxCnt >= minTxsInBlock && maxGasExceeded {
+		gasWanted := totalGasWanted + wtx.gasWanted
+		gasEstimated := totalGasEstimated + txGasEstimate
+		maxGasWantedExceeded := maxGasWanted > -1 && gasWanted > maxGasWanted
+		maxGasEstimatedExceeded := maxGasEstimated > -1 && gasEstimated > maxGasEstimated
+		if nonzeroGasTxCnt >= minTxsInBlock && (maxGasWantedExceeded || maxGasEstimatedExceeded) {
 			return false
 		}
 
-		totalGas = gas
+		totalGasWanted = gasWanted
+		totalGasEstimated = gasEstimated
 
 		txs = append(txs, wtx.tx)
 		if wtx.gasWanted > 0 {
