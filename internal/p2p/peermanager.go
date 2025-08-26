@@ -97,7 +97,7 @@ type PeerManagerOptions struct {
 	// necessary to make room for these.
 	PersistentPeers []types.NodeID
 
-	// Peers to which a connection will be (re)established ignoring any existing limits
+	// Peers to which a connection will be (re)established, dropping an existing peer if any existing limit has been reached
 	UnconditionalPeers []types.NodeID
 
 	// Only include those peers for block sync
@@ -157,7 +157,7 @@ type PeerManagerOptions struct {
 	// by optimize().
 	persistentPeers map[types.NodeID]bool
 
-	// List of node IDs, to which a connection will be (re)established ignoring any existing limits
+	// List of node IDs, to which a connection will be (re)established, dropping an existing peer if any existing limit has been reached
 	unconditionalPeers map[types.NodeID]struct{}
 
 	// blocksyncPeers provides fast blocksyncPeers lookups.
@@ -566,7 +566,7 @@ func (m *PeerManager) TryDialNext() (NodeAddress, error) {
 			}
 
 			m.dialing[peer.ID] = true
-			m.logger.Info(fmt.Sprintf("Going to dial peer %s with address %s", peer.ID, addressInfo.Address))
+			m.logger.Debug(fmt.Sprintf("Going to dial peer %s with address %s", peer.ID, addressInfo.Address))
 			return addressInfo.Address, nil
 		}
 	}

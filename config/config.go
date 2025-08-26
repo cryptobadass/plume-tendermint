@@ -250,7 +250,6 @@ func DefaultBaseConfig() BaseConfig {
 		FilterPeers: false,
 		DBBackend:   "goleveldb",
 		DBPath:      "data",
-		RootDir:     "/root/.plume",
 	}
 }
 
@@ -692,7 +691,7 @@ type P2PConfig struct { //nolint: maligned
 	// with the default being "priority".
 	QueueType string `mapstructure:"queue-type"`
 
-	// List of node IDs, to which a connection will be (re)established ignoring any existing limits
+	// List of node IDs, to which a connection will be (re)established, dropping an existing peer if any existing limit has been reached
 	UnconditionalPeerIDs string `mapstructure:"unconditional-peer-ids"`
 }
 
@@ -938,6 +937,11 @@ type StateSyncConfig struct {
 
 	// Time before which a blacklisted witness can not be added back as a provider
 	BlacklistTTL time.Duration `mapstructure:"blacklist-ttl"`
+
+	// Whether to use local snapshot only for state sync or not.
+	// If this is true, then state sync will look for existing snapshots
+	// which are located in the snapshot-dir configured in app.toml (default to [home-dir]/data/snapshots)
+	UseLocalSnapshot bool `mapstructure:"use-local-snapshot"`
 }
 
 func (cfg *StateSyncConfig) TrustHashBytes() []byte {

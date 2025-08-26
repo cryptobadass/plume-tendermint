@@ -348,7 +348,7 @@ send-rate = {{ .P2P.SendRate }}
 # TODO: Remove once MConnConnection is removed.
 recv-rate = {{ .P2P.RecvRate }}
 
-# List of node IDs, to which a connection will be (re)established ignoring any existing limits
+# List of node IDs, to which a connection will be (re)established, dropping an existing peer if any existing limit has been reached
 unconditional-peer-ids = "{{ .P2P.UnconditionalPeerIDs }}"
 
 
@@ -464,6 +464,11 @@ discovery-time = "{{ .StateSync.DiscoveryTime }}"
 # The synchronizer will create a new, randomly named directory within this directory
 # and remove it when the sync is complete.
 temp-dir = "{{ .StateSync.TempDir }}"
+
+# Whether to use local snapshot only for state sync or not.
+# If this is true, then state sync will look for existing snapshots
+# which are located in the snapshot-dir configured in app.toml (default to [home-dir]/data/snapshots)
+use-local-snapshot = {{ .StateSync.UseLocalSnapshot }}
 
 # The timeout duration before re-requesting a chunk, possibly from a different
 # peer (default: 15 seconds).
