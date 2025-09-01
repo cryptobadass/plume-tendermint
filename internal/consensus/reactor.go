@@ -1142,7 +1142,6 @@ func (r *Reactor) handleDataMessage(ctx context.Context, envelope *p2p.Envelope,
 		pMsg := msgI.(*ProposalMessage)
 
 		ps.SetHasProposal(pMsg.Proposal)
-
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
